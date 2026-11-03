@@ -149,8 +149,11 @@ internal sealed class ChatGptResponsesClient(HttpClient http, ChatGptSession ses
             request.Headers.Accept.ParseAdd("text/event-stream");
             var body = new Dictionary<string, object>
             {
-                ["model"] = model, ["instructions"] = instructions, ["input"] = input,
-                ["store"] = false, ["stream"] = true
+                ["model"] = model,
+                ["instructions"] = instructions,
+                ["input"] = input,
+                ["store"] = false,
+                ["stream"] = true
             };
             if (reasoningEffort != "default")
                 body["reasoning"] = new { effort = reasoningEffort };

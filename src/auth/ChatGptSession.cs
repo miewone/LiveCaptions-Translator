@@ -53,9 +53,12 @@ internal sealed class ChatGptSession
                 attempt.AuthorizeUrl(vault.HostId, previous?.IdToken, requestConsent), timeout.Token);
             using var response = await TokenRequestAsync(new()
             {
-                ["grant_type"] = "authorization_code", ["client_id"] = callback.ClientId,
-                ["code"] = callback.Code, ["code_verifier"] = attempt.Verifier,
-                ["redirect_uri"] = attempt.RedirectUri, ["resource"] = OAuthAttempt.Resource
+                ["grant_type"] = "authorization_code",
+                ["client_id"] = callback.ClientId,
+                ["code"] = callback.Code,
+                ["code_verifier"] = attempt.Verifier,
+                ["redirect_uri"] = attempt.RedirectUri,
+                ["resource"] = OAuthAttempt.Resource
             }, timeout.Token);
             var root = response.RootElement;
             var idToken = root.GetProperty("id_token").GetString()!;
@@ -123,7 +126,9 @@ internal sealed class ChatGptSession
                     {
                         using var form = new FormUrlEncodedContent(new Dictionary<string, string>
                         {
-                            ["token"] = account.RefreshToken, ["token_type_hint"] = "refresh_token", ["client_id"] = account.ClientId
+                            ["token"] = account.RefreshToken,
+                            ["token_type_hint"] = "refresh_token",
+                            ["client_id"] = account.ClientId
                         });
                         using var response = await http.PostAsync(endpoint, form, token);
                         revoked = response.StatusCode == HttpStatusCode.OK;
@@ -166,8 +171,10 @@ internal sealed class ChatGptSession
             {
                 using var response = await TokenRequestAsync(new()
                 {
-                    ["grant_type"] = "refresh_token", ["client_id"] = account.ClientId,
-                    ["refresh_token"] = account.RefreshToken, ["resource"] = OAuthAttempt.Resource
+                    ["grant_type"] = "refresh_token",
+                    ["client_id"] = account.ClientId,
+                    ["refresh_token"] = account.RefreshToken,
+                    ["resource"] = OAuthAttempt.Resource
                 }, token);
                 var root = response.RootElement;
                 if (root.TryGetProperty("id_token", out var refreshedId))
