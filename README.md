@@ -1,4 +1,8 @@
-﻿<div align="center">
+> **ChatGPT OAuth extension:** This local source includes Sign in with ChatGPT, account management,
+> automatic token renewal, and streamed Responses translations. See [한국어 사용 및 검증 안내](README_ko.md).
+> Based on upstream commit `a6fee12757b15edbeef7c60f8895e0be694801e1`; existing API-key engines remain available.
+
+<div align="center">
 
 <img src="src/LiveCaptions-Translator.ico" width="128" height="128" alt="LiveCaptions-Translator Icon"/>
 

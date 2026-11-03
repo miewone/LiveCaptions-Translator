@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
@@ -25,7 +25,7 @@ namespace LiveCaptionsTranslator
         public HistoryPage()
         {
             InitializeComponent();
-            ApplicationThemeManager.ApplySystemTheme();
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
 
             Loaded += async (s, e) =>
             {

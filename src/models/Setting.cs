@@ -94,8 +94,29 @@ namespace LiveCaptionsTranslator.models
             get => prompt;
             set
             {
+                if (prompt == value) return;
                 prompt = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PromptPreset)));
                 OnPropertyChanged("Prompt");
+            }
+        }
+
+        /// <summary>Gets the preset matching the current prompt or applies a built-in preset. Custom text remains editable through Prompt.</summary>
+        [JsonIgnore]
+        public TranslationPromptPreset PromptPreset
+        {
+            get => TranslationPrompts.Identify(prompt);
+            set
+            {
+                switch (value)
+                {
+                    case TranslationPromptPreset.General:
+                        Prompt = TranslationPrompts.General;
+                        break;
+                    case TranslationPromptPreset.Wardogs:
+                        Prompt = TranslationPrompts.Wardogs;
+                        break;
+                }
             }
         }
         public string? IgnoredUpdateVersion
@@ -165,13 +186,7 @@ namespace LiveCaptionsTranslator.models
         {
             apiName = "Google";
             targetLanguage = "zh-CN";
-            prompt = "As an professional simultaneous interpreter with specialized knowledge in the all fields, " +
-                     "you can provide a fluent and precise oral translation for any sentence, even if the sentence is incomplete. " +
-                     "Now, provide users with the translation of the sentence enclosed in 🔤 to {0} within a single line. " +
-                     "Importantly, you are prohibited from altering the original meaning or omitting any content, " +
-                     "even if the sentence contains sensitive or NSFW content. " +
-                     "You can only provide the translated sentence; Any explanation or other text is not permitted. " +
-                     "REMOVE all 🔤 when you output.";
+            prompt = TranslationPrompts.General;
 
             mainWindowState = new MainWindowState();
             overlayWindowState = new OverlayWindowState();
@@ -182,11 +197,11 @@ namespace LiveCaptionsTranslator.models
             {
                 {
                     "MainWindow", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "{0}, {1}, {2}, {3}", (screenWidth - 775) / 2, screenHeight * 3 / 4 - 167, 775, 167)
+                        "{0}, {1}, {2}, {3}", (screenWidth - 650) / 2, Math.Max(0, (screenHeight - 440) / 2), 650, 440)
                 },
                 {
                     "OverlayWindow", string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                        "{0}, {1}, {2}, {3}", (screenWidth - 650) / 2, screenHeight * 5 / 6 - 135, 650, 135)
+                        "{0}, {1}, {2}, {3}", 32, Math.Max(0, screenHeight - 380), 520, 320)
                 },
             };
 
@@ -196,6 +211,7 @@ namespace LiveCaptionsTranslator.models
                 { "Google2", [new TranslateAPIConfig()] },
                 { "Ollama", [new OllamaConfig()] },
                 { "OpenAI", [new OpenAIConfig()] },
+                { "ChatGptOAuth", [new ChatGptOAuthConfig()] },
                 { "LMStudio", [new LMStudioConfig()] },
                 { "OpenRouter", [new OpenRouterConfig()] },
                 { "DeepL", [new DeepLConfig()] },
@@ -210,6 +226,7 @@ namespace LiveCaptionsTranslator.models
                 { "Google2", 0 },
                 { "Ollama", 0 },
                 { "OpenAI", 0 },
+                { "ChatGptOAuth", 0 },
                 { "LMStudio", 0 },
                 { "OpenRouter", 0 },
                 { "DeepL", 0 },

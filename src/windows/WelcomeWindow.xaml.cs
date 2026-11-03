@@ -11,15 +11,11 @@ namespace LiveCaptionsTranslator
         public WelcomeWindow()
         {
             InitializeComponent();
-            ApplicationThemeManager.ApplySystemTheme();
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
 
             Loaded += (s, e) =>
             {
-                SystemThemeWatcher.Watch(
-                    this,
-                    WindowBackdropType.Mica,
-                    true
-                );
+                ApplicationThemeManager.Apply(ApplicationTheme.Dark);
             };
         }
 

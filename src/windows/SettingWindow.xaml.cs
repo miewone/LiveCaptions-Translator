@@ -21,12 +21,14 @@ namespace LiveCaptionsTranslator
         public SettingWindow()
         {
             InitializeComponent();
-            ApplicationThemeManager.ApplySystemTheme();
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
             DataContext = Translator.Setting;
+            Loaded += InitializeChatGpt;
+            Closed += (_, _) => chatGptOperation?.Cancel();
 
             Loaded += (sender, args) =>
             {
-                SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
+                ApplicationThemeManager.Apply(ApplicationTheme.Dark);
                 Initialize();
                 SelectButton(PromptButton);
             };

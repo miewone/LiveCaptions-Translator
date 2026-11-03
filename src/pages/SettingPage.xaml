@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="clr-namespace:LiveCaptionsTranslator"
+    xmlns:models="clr-namespace:LiveCaptionsTranslator.models"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     Title="SettingPage"
@@ -164,6 +165,22 @@
                     IsEditable="True"
                     LostFocus="TargetLangBox_LostFocus"
                     SelectionChanged="TargetLangBox_SelectionChanged" />
+            </StackPanel>
+            <StackPanel Margin="15,10,0,0" Orientation="Vertical">
+                <TextBlock Margin="2.5,0,0,5" Text="번역 용도" />
+                <ComboBox
+                    x:Name="TranslationPurposeBox"
+                    Width="150"
+                    Height="30"
+                    Padding="10,4,10,7"
+                    FontSize="13.3"
+                    SelectedValuePath="Tag"
+                    SelectedValue="{Binding PromptPreset, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                    ToolTip="선택하면 기존 번역 프롬프트가 바뀝니다. WARDOGS + ChatGPT OAuth에서는 짧은 추천 답변 3개와 한국어 뜻도 함께 표시됩니다.">
+                    <ComboBoxItem Content="일반 번역" Tag="{x:Static models:TranslationPromptPreset.General}" />
+                    <ComboBoxItem Content="WARDOGS 게임용" Tag="{x:Static models:TranslationPromptPreset.Wardogs}" />
+                    <ComboBoxItem Content="사용자 지정" Tag="{x:Static models:TranslationPromptPreset.Custom}" IsEnabled="False" />
+                </ComboBox>
             </StackPanel>
         </StackPanel>
 

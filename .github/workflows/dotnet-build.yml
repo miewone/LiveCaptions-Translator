@@ -9,6 +9,8 @@ on:
     paths:
       - "src/**"
       - "Properties/**"
+      - "tests/**"
+      - "*.csproj"
       - ".github/workflows/**"
   pull_request:
   workflow_dispatch:
@@ -48,7 +50,7 @@ jobs:
           del ./publish/arm64/framework/*.pdb 2>nul || echo "No pdb found in arm64 framework"
 
       - name: Run Tests
-        run: dotnet test --verbosity normal
+        run: dotnet run --project tests/ChatGptOAuth.Tests --configuration Release
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

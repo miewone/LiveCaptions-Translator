@@ -14,6 +14,15 @@ namespace LiveCaptionsTranslator.models
         private int originalFontSize = 15;
         private int translatedFontSize = 18;
 
+        private bool showOriginal = true;
+
+        /// <summary>Whether the main chat feed displays original text below translated captions.</summary>
+        public bool ShowOriginal
+        {
+            get => showOriginal;
+            set { showOriginal = value; OnPropertyChanged(); }
+        }
+
         public bool Topmost
         {
             get => topmost;

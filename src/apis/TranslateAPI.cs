@@ -12,6 +12,9 @@ namespace LiveCaptionsTranslator.apis
 {
     public static class TranslateAPI
     {
+        /// <summary>Shared 10 MiB, fifteen-minute result cache across translation engines.</summary>
+        internal static TranslationCache Cache { get; } = new();
+
         /*
          * The key of this field is used as the content for `translateAPIBox` in the `SettingPage`.
          * If you'd like to add a new API, please insert the key-value pair here.
@@ -23,6 +26,7 @@ namespace LiveCaptionsTranslator.apis
             { "Google2", Google2 },
             { "Ollama", Ollama },
             { "OpenAI", OpenAI },
+            { "ChatGptOAuth", (text, token) => ChatGptOAuth(text, null, token) },
             { "LMStudio", LMStudio },
             { "DeepL", DeepL },
             { "OpenRouter", OpenRouter },
@@ -33,7 +37,7 @@ namespace LiveCaptionsTranslator.apis
         };
         public static readonly List<string> LLM_BASED_APIS = new()
         {
-            "Ollama", "OpenAI", "OpenRouter", "LMStudio"
+            "Ollama", "OpenAI", "OpenRouter", "LMStudio", "ChatGptOAuth"
         };
         public static readonly List<string> NO_CONFIG_APIS = new()
         {
@@ -50,6 +54,37 @@ namespace LiveCaptionsTranslator.apis
             Timeout = TimeSpan.FromSeconds(8)
         };
         private static int openai_fallback_index = 0;
+
+        /// <summary>Translates with the selected ChatGPT account and streams provisional text to the caption queue.</summary>
+        /// <param name="text">Source caption to translate.</param>
+        /// <param name="progress">Optional accumulated translation callback.</param>
+        /// <param name="token">Cancellation for superseded captions or shutdown.</param>
+        public static async Task<string> ChatGptOAuth(string text, Action<string>? progress, CancellationToken token = default) =>
+            (await ChatGptOAuthCaption(text, progress, token)).Text;
+
+        /// <summary>Translates a caption and includes reply choices in the same OAuth request for the WARDOGS preset.</summary>
+        /// <param name="text">Current source caption.</param>
+        /// <param name="progress">Receives decoded translation text while streaming.</param>
+        /// <param name="token">Cancellation for superseded or paused captions.</param>
+        public static Task<TranslationResult> ChatGptOAuthCaption(string text, Action<string>? progress, CancellationToken token = default)
+        {
+            var setting = Translator.Setting ?? throw new InvalidOperationException("Translation settings are unavailable.");
+            var config = (ChatGptOAuthConfig)setting["ChatGptOAuth"];
+            var model = config.ModelName;
+            var reasoningEffort = config.GetReasoningEffort(model);
+            var messages = new List<BaseLLMConfig.Message>();
+            if (setting.ContextAware && Translator.Caption != null)
+                foreach (var entry in Translator.Caption.AwareContexts)
+                {
+                    if (entry.TranslatedText.Contains("[ERROR]") || entry.TranslatedText.Contains("[WARNING]")) continue;
+                    messages.Add(new() { role = "user", content = $"🔤 {entry.SourceText} 🔤" });
+                    messages.Add(new() { role = "assistant", content = RegexPatterns.NoticePrefix().Replace(entry.TranslatedText, "") });
+                }
+            messages.Add(new() { role = "user", content = $"🔤 {text} 🔤" });
+            return auth.ChatGptRuntime.Responses.TranslateCaptionAsync(model,
+                string.Format(Prompt, setting.TargetLanguage), messages,
+                setting.PromptPreset == TranslationPromptPreset.Wardogs, progress, token, reasoningEffort);
+        }
 
         public static async Task<string> OpenAI(string text, CancellationToken token = default)
         {

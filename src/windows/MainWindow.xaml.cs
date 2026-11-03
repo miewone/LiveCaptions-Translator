@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
 using Wpf.Ui.Appearance;
@@ -18,11 +18,11 @@ namespace LiveCaptionsTranslator
         public MainWindow()
         {
             InitializeComponent();
-            ApplicationThemeManager.ApplySystemTheme();
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
 
             Loaded += (s, e) =>
             {
-                SystemThemeWatcher.Watch(this, WindowBackdropType.Mica, true);
+                ApplicationThemeManager.Apply(ApplicationTheme.Dark);
                 RootNavigation.Navigate(typeof(CaptionPage));
                 IsAutoHeight = true;
                 CheckForFirstUse();
@@ -37,13 +37,15 @@ namespace LiveCaptionsTranslator
                 windowState.Top <= 0 || windowState.Top >= screenHeight)
             {
                 WindowHandler.RestoreState(this, new Rect(
-                    (screenWidth - 775) / 2, screenHeight * 3 / 4 - 167, 775, 167));
+                    (screenWidth - 650) / 2, Math.Max(0, (screenHeight - 440) / 2), 650, 440));
             }
             else
                 WindowHandler.RestoreState(this, windowState);
 
+            Top = Math.Clamp(Top, SystemParameters.WorkArea.Top,
+                Math.Max(SystemParameters.WorkArea.Top, SystemParameters.WorkArea.Bottom - Height));
             ToggleTopmost(Translator.Setting.MainWindow.Topmost);
-            ShowLogCard(Translator.Setting.MainWindow.CaptionLogEnabled);
+            ShowLogCard(Translator.Setting.MainWindow.ShowOriginal);
         }
 
         private void TopmostButton_Click(object sender, RoutedEventArgs e)
@@ -53,80 +55,46 @@ namespace LiveCaptionsTranslator
 
         private void OverlayModeButton_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Button;
-            var symbolIcon = button?.Icon as SymbolIcon;
-
             if (OverlayWindow == null)
             {
-                symbolIcon.Symbol = SymbolRegular.ClosedCaption24;
-                symbolIcon.Filled = true;
-
                 OverlayWindow = new OverlayWindow();
-                OverlayWindow.SizeChanged +=
-                    (s, e) => WindowHandler.SaveState(OverlayWindow, Translator.Setting);
-                OverlayWindow.LocationChanged +=
-                    (s, e) => WindowHandler.SaveState(OverlayWindow, Translator.Setting);
-
                 double screenWidth = SystemParameters.PrimaryScreenWidth;
                 double screenHeight = SystemParameters.PrimaryScreenHeight;
-
-                var windowState = WindowHandler.LoadState(OverlayWindow, Translator.Setting);
-                if (windowState.Left <= 0 || windowState.Left >= screenWidth ||
-                    windowState.Top <= 0 || windowState.Top >= screenHeight)
+                var bounds = WindowHandler.LoadState(OverlayWindow, Translator.Setting);
+                if (bounds.IsEmpty || bounds.Left < 0 || bounds.Left >= screenWidth || bounds.Top < 0 || bounds.Top >= screenHeight)
+                    bounds = new Rect(32, Math.Max(0, screenHeight - 380), 520, 320);
+                WindowHandler.RestoreState(OverlayWindow, bounds);
+                OverlayWindow.Top = Math.Clamp(OverlayWindow.Top, SystemParameters.WorkArea.Top,
+                    Math.Max(SystemParameters.WorkArea.Top, SystemParameters.WorkArea.Bottom - OverlayWindow.Height));
+                OverlayWindow.SizeChanged += (s, args) => WindowHandler.SaveState(OverlayWindow, Translator.Setting);
+                OverlayWindow.LocationChanged += (s, args) => WindowHandler.SaveState(OverlayWindow, Translator.Setting);
+                OverlayWindow.Closed += (_, _) =>
                 {
-                    WindowHandler.RestoreState(OverlayWindow, new Rect(
-                        (screenWidth - 650) / 2, screenHeight * 5 / 6 - 135, 650, 135));
-                }
-                else
-                    WindowHandler.RestoreState(OverlayWindow, windowState);
-
+                    OverlayWindow = null;
+                    OverlayModeButton.Content = "오버레이";
+                    UnlockOverlayButton.Visibility = Visibility.Collapsed;
+                };
                 OverlayWindow.Show();
+                OverlayModeButton.Content = "오버레이 닫기";
+                UnlockOverlayButton.Visibility = Visibility.Visible;
             }
-            else
-            {
-                symbolIcon.Symbol = SymbolRegular.ClosedCaptionOff24;
-                symbolIcon.Filled = false;
-
-                switch (OverlayWindow.OnlyMode)
-                {
-                    case CaptionVisible.TranslationOnly:
-                        OverlayWindow.OnlyMode = CaptionVisible.SubtitleOnly;
-                        OverlayWindow.OnlyMode = CaptionVisible.Both;
-                        break;
-                    case CaptionVisible.SubtitleOnly:
-                        OverlayWindow.OnlyMode = CaptionVisible.Both;
-                        break;
-                }
-
-                OverlayWindow.Close();
-                OverlayWindow = null;
-            }
+            else OverlayWindow.Close();
         }
+
+        private void UnlockOverlay_Click(object sender, RoutedEventArgs e) => OverlayWindow?.SetClickThrough(false);
 
         private void LogOnlyButton_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Button;
-            var symbolIcon = button?.Icon as SymbolIcon;
-
-            if (Translator.LogOnlyFlag)
-            {
-                Translator.LogOnlyFlag = false;
-                symbolIcon.Filled = false;
-            }
-            else
-            {
-                Translator.LogOnlyFlag = true;
-                symbolIcon.Filled = true;
-            }
-
+            Translator.LogOnlyFlag = !Translator.LogOnlyFlag;
+            LogOnlyButton.Content = Translator.LogOnlyFlag ? "번역 재개" : "일시정지";
             Translator.ClearContexts();
         }
 
         private void CaptionLogButton_Click(object sender, RoutedEventArgs e)
         {
-            Translator.Setting.MainWindow.CaptionLogEnabled = !Translator.Setting.MainWindow.CaptionLogEnabled;
-            ShowLogCard(Translator.Setting.MainWindow.CaptionLogEnabled);
-            CaptionPage.Instance?.AutoHeight();
+            var settings = Translator.Setting!.MainWindow;
+            settings.ShowOriginal = !settings.ShowOriginal;
+            ShowLogCard(settings.ShowOriginal);
         }
 
         private void MainWindow_LocationChanged(object sender, EventArgs e)
@@ -225,16 +193,12 @@ namespace LiveCaptionsTranslator
             }
         }
 
+        /// <summary>Updates the main chat's source-text toggle.</summary>
+        /// <param name="enabled">True shows original captions below translations.</param>
         public void ShowLogCard(bool enabled)
         {
-            if (CaptionLogButton.Icon is SymbolIcon icon)
-            {
-                if (enabled)
-                    icon.Symbol = SymbolRegular.History24;
-                else
-                    icon.Symbol = SymbolRegular.HistoryDismiss24;
-                CaptionPage.Instance?.CollapseTranslatedCaption(enabled);
-            }
+            CaptionLogButton.Content = enabled ? "원문 켜짐" : "원문 꺼짐";
+            CaptionPage.Instance?.ShowOriginal(enabled);
         }
 
         public void AutoHeightAdjust(int minHeight = -1, int maxHeight = -1)

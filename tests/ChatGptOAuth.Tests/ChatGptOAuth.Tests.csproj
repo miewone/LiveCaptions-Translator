@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../src/auth/*.cs" Exclude="../../src/auth/WindowsOAuthStore.cs;../../src/auth/ChatGptRuntime.cs" />
+    <Compile Include="../../src/apis/ResponsesStreamReader.cs" />
+    <Compile Include="../../src/apis/ChatGptResponsesClient.cs" />
+    <Compile Include="../../src/apis/WardogsCaptionResponse.cs" />
+    <Compile Include="../../src/models/TranslationResult.cs" />
+    <Compile Include="../../src/models/TranslationCache.cs" />
+    <Compile Include="../../src/models/ChatGptModel.cs" />
+    <Compile Include="../../src/models/ChatGptOAuthConfig.cs" />
+    <Compile Include="../../src/models/TranslateAPIConfig.cs" />
+    <Compile Include="../../src/models/TranslationTaskQueue.cs" />
+    <Compile Include="../../src/models/ChatTranscript.cs" />
+  </ItemGroup>
+</Project>

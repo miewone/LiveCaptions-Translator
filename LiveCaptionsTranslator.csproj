@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
@@ -23,6 +23,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+        <Compile Remove="tests\**\*.cs" />
+        <Page Remove="tests\**\*.xaml" />
 		<ApplicationDefinition Include="src\App.xaml">
 			<Generator>MSBuild:Compile</Generator>
 			<SubType>Designer</SubType>

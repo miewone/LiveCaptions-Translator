@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Reflection;
 using System.Windows.Controls;
 using System.Windows.Navigation;
@@ -13,7 +13,7 @@ namespace LiveCaptionsTranslator
         public InfoPage()
         {
             InitializeComponent();
-            ApplicationThemeManager.ApplySystemTheme();
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
             var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
             Version.Text = version;
 

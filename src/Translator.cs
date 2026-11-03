@@ -1,6 +1,7 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Automation;
 
 using LiveCaptionsTranslator.apis;
@@ -26,7 +27,19 @@ namespace LiveCaptionsTranslator
         public static Caption? Caption => caption;
         public static Setting? Setting => setting;
 
-        public static bool LogOnlyFlag { get; set; } = false;
+        /// <summary>Shared game-chat transcript. Updates are dispatched to the WPF UI thread.</summary>
+        public static ChatTranscript Chat { get; } = new();
+        private static volatile bool logOnlyFlag;
+        public static bool LogOnlyFlag
+        {
+            get => logOnlyFlag;
+            set
+            {
+                logOnlyFlag = value;
+                if (value) translationTaskQueue.CancelAll();
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() => Chat.SetPaused(value)));
+            }
+        }
         public static bool FirstUseFlag { get; set; } = false;
 
         public static event Action? TranslationLogged;
@@ -42,6 +55,8 @@ namespace LiveCaptionsTranslator
 
             caption = Caption.GetInstance();
             setting = Setting.Load();
+            translationTaskQueue.CaptionUpdated += update =>
+                System.Windows.Application.Current?.Dispatcher.BeginInvoke(new Action(() => Chat.Apply(update)));
         }
 
         public static void SyncLoop()
@@ -181,8 +196,8 @@ namespace LiveCaptionsTranslator
                     }
                     else
                     {
-                        translationTaskQueue.Enqueue(token => Task.Run(
-                            () => Translate(originalSnapshot, token), token), originalSnapshot);
+                        translationTaskQueue.EnqueueResult((token, progress) => Task.Run(
+                            () => TranslateCaption(originalSnapshot, token, progress), token), originalSnapshot);
                     }
                 }
 
@@ -201,6 +216,13 @@ namespace LiveCaptionsTranslator
                     Caption.TranslatedCaption = string.Empty;
                     Caption.DisplayTranslatedCaption = "[Paused]";
                     Caption.OverlayNoticePrefix = "[Paused]";
+                    Caption.OverlayCurrentTranslation = string.Empty;
+                }
+                else if (string.IsNullOrEmpty(translatedText) && Setting.ApiName == "ChatGptOAuth")
+                {
+                    Caption.TranslatedCaption = string.Empty;
+                    Caption.DisplayTranslatedCaption = string.Empty;
+                    Caption.OverlayNoticePrefix = string.Empty;
                     Caption.OverlayCurrentTranslation = string.Empty;
                 }
                 else if (!string.IsNullOrEmpty(RegexPatterns.NoticePrefix().Replace(
@@ -230,24 +252,60 @@ namespace LiveCaptionsTranslator
             }
         }
 
-        public static async Task<(string, bool)> Translate(string text, CancellationToken token = default)
+        /// <summary>Translates a caption and optionally reports provisional OAuth text before the final result.</summary>
+        /// <param name="text">Source caption.</param>
+        /// <param name="token">Cancellation for a superseded translation.</param>
+        /// <param name="progress">Receives accumulated provisional text for streaming engines.</param>
+        public static async Task<(string, bool)> Translate(string text, CancellationToken token = default, Action<string>? progress = null)
+        {
+            var result = await TranslateCaption(text, token, progress);
+            return (result.Text, result.IsChoke);
+        }
+
+        /// <summary>Translates source speech, retaining reply choices separately from display text and persistent history.</summary>
+        /// <param name="text">Current source caption.</param>
+        /// <param name="token">Cancellation for a superseded translation.</param>
+        /// <param name="progress">Receives provisional translation text.</param>
+        public static async Task<TranslationResult> TranslateCaption(string text, CancellationToken token = default, Action<string>? progress = null)
         {
             string translatedText;
+            TranslationResult? captionResult = null;
             bool isChoke = Array.IndexOf(TextUtil.PUNC_EOS, text[^1]) != -1;
 
             try
             {
                 var sw = Setting.MainWindow.LatencyShow ? Stopwatch.StartNew() : null;
 
-                if (Setting.ContextAware && !TranslateAPI.IsLLMBased)
+                if (Setting.ApiName == "ChatGptOAuth")
                 {
-                    translatedText = await TranslateAPI.TranslateFunction($"{Caption.AwareContextsCaption} 🔤 {text} 🔤", token);
-                    translatedText = RegexPatterns.TargetSentence().Match(translatedText).Groups[1].Value;
+                    captionResult = await TranslateAPI.ChatGptOAuthCaption(text, progress, token);
+                    translatedText = captionResult.Text.Replace("🔤", "");
                 }
                 else
                 {
-                    translatedText = await TranslateAPI.TranslateFunction(text, token);
-                    translatedText = translatedText.Replace("🔤", "");
+                    token.ThrowIfCancellationRequested();
+                    var cacheKey = NonOAuthCacheKey(text);
+                    if (TranslateAPI.Cache.TryGet(cacheKey, out captionResult))
+                    {
+                        token.ThrowIfCancellationRequested();
+                        translatedText = captionResult!.Text;
+                        progress?.Invoke(translatedText);
+                        token.ThrowIfCancellationRequested();
+                    }
+                    else
+                    {
+                        if (Setting.ContextAware && !TranslateAPI.IsLLMBased)
+                        {
+                            translatedText = await TranslateAPI.TranslateFunction($"{Caption.AwareContextsCaption} 🔤 {text} 🔤", token);
+                            translatedText = RegexPatterns.TargetSentence().Match(translatedText).Groups[1].Value;
+                        }
+                        else
+                            translatedText = (await TranslateAPI.TranslateFunction(text, token)).Replace("🔤", "");
+                        token.ThrowIfCancellationRequested();
+                        // These engines read live settings. Do not cache a result if settings/context changed in flight.
+                        if (cacheKey == NonOAuthCacheKey(text))
+                            TranslateAPI.Cache.Store(cacheKey, new(translatedText));
+                    }
                 }
 
                 if (sw != null)
@@ -262,10 +320,28 @@ namespace LiveCaptionsTranslator
             }
             catch (Exception ex)
             {
-                return ($"[ERROR] Translation Failed: {ex.Message}", isChoke);
+                return new($"[ERROR] Translation Failed: {ex.Message}", isChoke);
             }
 
-            return (translatedText, isChoke);
+            return (captionResult ?? new TranslationResult(translatedText)) with { Text = translatedText, IsChoke = isChoke };
+        }
+
+        private static string NonOAuthCacheKey(string source)
+        {
+            var current = Setting!;
+            var api = current.ApiName;
+            var config = current[api];
+            return TranslationCache.CreateKey(new
+            {
+                engine = api,
+                source,
+                language = current.TargetLanguage,
+                prompt = current.Prompt,
+                configuration = JsonSerializer.SerializeToElement(config, config.GetType()),
+                context = current.ContextAware
+                    ? Caption?.AwareContexts.Select(entry => new { entry.SourceText, entry.TranslatedText }).ToArray()
+                    : null
+            });
         }
 
         public static async Task Log(string originalText, string translatedText,

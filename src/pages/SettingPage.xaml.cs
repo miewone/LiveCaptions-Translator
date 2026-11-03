@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,7 +17,8 @@ namespace LiveCaptionsTranslator
         public SettingPage()
         {
             InitializeComponent();
-            ApplicationThemeManager.ApplySystemTheme();
+            ApplicationThemeManager.Apply(ApplicationTheme.Dark);
+            var savedApiName = Translator.Setting?.ApiName;
             DataContext = Translator.Setting;
 
             Loaded += (s, e) =>
@@ -27,7 +28,7 @@ namespace LiveCaptionsTranslator
             };
 
             TranslateAPIBox.ItemsSource = Translator.Setting?.Configs.Keys;
-            TranslateAPIBox.SelectedIndex = 0;
+            TranslateAPIBox.SelectedItem = savedApiName;
 
             LoadAPISetting();
         }

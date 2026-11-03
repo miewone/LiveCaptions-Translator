@@ -363,3 +363,7 @@ MigrationBackup/
 FodyWeavers.xsd
 
 .idea/
+# Local OAuth credentials (the application normally stores these in LocalAppData)
+*.dpapi
+*.dpapi.*.tmp
+vault.lock
