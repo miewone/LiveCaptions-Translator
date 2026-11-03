@@ -62,6 +62,8 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
     steps:
@@ -82,6 +84,22 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          fail_on_unmatched_files: true
+          body: |
+            ## 주요 기능
+            - ChatGPT OAuth 로그인과 계정·모델 선택
+            - 실시간 한국어 자막 번역
+            - 게임 모드용 채팅 화면과 오버레이
+            - 대화 맥락 기반 추천 응답
+
+            ## 다운로드 및 실행
+            - 일반 Intel·AMD Windows 11 PC: `LiveCaptionsTranslator-win-x64-withruntime.exe`
+            - ARM Windows 11 PC: `LiveCaptionsTranslator-win-arm64-withruntime.exe`
+            - `withruntime` 파일은 .NET 런타임을 포함합니다.
+            - Windows 실시간 캡션을 켜고 사용할 음성 언어를 설정한 뒤 앱을 실행하세요.
+            - `Source code` 압축 파일은 개발용 소스입니다.
+
+            자세한 설정은 [한국어 사용 안내](https://github.com/miewone/LiveCaptions-Translator/blob/${{ github.ref_name }}/README_ko.md)를 참고하세요.
           files: |
             release/LiveCaptionsTranslator-win-x64.exe
             release/LiveCaptionsTranslator-win-x64-withruntime.exe
